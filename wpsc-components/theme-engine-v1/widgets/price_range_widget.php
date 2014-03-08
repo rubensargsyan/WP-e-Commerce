@@ -145,7 +145,7 @@ if ( isset( $_GET['range'] ) ) {
 function wpsc_range_where( $where ) {
 	global $wpdb;
 
-    if ( ! strpos( $where, 'wpsc-product' ) ) {
+    if ( false === strpos( $where, 'wpsc-product' ) ) {
         return $where;
     }
 
