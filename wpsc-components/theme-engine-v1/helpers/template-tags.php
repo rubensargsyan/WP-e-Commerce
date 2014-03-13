@@ -1003,6 +1003,8 @@ function wpsc_the_product_thumbnail( $width = null, $height = null, $product_id 
 			$page = 'products-page';
 	}
 
+    $crop_thumbnails = get_option( 'wpsc_crop_thumbnails', false );
+
 	if ( ! $width && ! $height ) {
 		$width  = get_option( 'product_image_width' );
 		$height = get_option( 'product_image_height' );
@@ -1013,21 +1015,35 @@ function wpsc_the_product_thumbnail( $width = null, $height = null, $product_id 
 			$custom_height = get_post_meta( $thumbnail_id, '_wpsc_custom_thumb_h', true );
 
 			if ( ! empty( $custom_width ) && ! empty( $custom_height ) ) {
-				$width  = $custom_width;
-				$height = $custom_height;
+                $thumbnail = wpsc_product_image( $thumbnail_id, $custom_width, $custom_height );
 			}
 		} elseif ( $page == 'single' && isset( $thumbnail_id ) ) {
 			$custom_thumbnail = get_post_meta( $thumbnail_id, '_wpsc_selected_image_size', true );
 
 			if ( ! $custom_thumbnail ) {
 				$custom_thumbnail = 'medium-single-product';
-				$current_size = image_get_intermediate_size( $thumbnail_id, $custom_thumbnail );
-				$settings_width  = get_option( 'single_view_image_width' );
-				$settings_height = get_option( 'single_view_image_height' );
+            }
 
-				if ( ! $current_size || ( $current_size['width'] != $settings_width && $current_size['height'] != $settings_height ) )
-					_wpsc_regenerate_thumbnail_size( $thumbnail_id, $custom_thumbnail );
-			}
+            $current_size = image_get_intermediate_size( $thumbnail_id, $custom_thumbnail );
+            $settings_width  = get_option( 'single_view_image_width' );
+            $settings_height = get_option( 'single_view_image_height' );
+
+            if ( empty( $current_size ) ) {
+                _wpsc_regenerate_thumbnail_size( $thumbnail_id, $custom_thumbnail );
+            } elseif ( $crop_thumbnails ) {
+                if ( $current_size['width'] != $settings_width || $current_size['height'] != $settings_height ) {
+                    _wpsc_regenerate_thumbnail_size( $thumbnail_id, $custom_thumbnail );
+                }
+            } else {
+                $full_image = wp_get_attachment_image_src( $thumbnail_id, 'full' );
+
+                $image_resize_dimensions = image_resize_dimensions( $full_image[1], $full_image[2], $settings_width, $settings_height, false );
+
+                if ( ! empty( $image_resize_dimensions ) && ( $image_resize_dimensions[4] != $current_size['width'] || $image_resize_dimensions[5] != $current_size['height'] ) ) {
+                    _wpsc_regenerate_thumbnail_size( $thumbnail_id, $custom_thumbnail );
+                }
+            }
+
 			$src = wp_get_attachment_image_src( $thumbnail_id, $custom_thumbnail );
 
 			if ( ! empty( $src ) && is_string( $src[0] ) )
@@ -1046,7 +1062,7 @@ function wpsc_the_product_thumbnail( $width = null, $height = null, $product_id 
 	}
 
 	// Calculate the height based on the ratio of the original dimensions.
-	if ( $height == 0 || $width == 0 ) {
+	if ( ! $thumbnail && ( $height == 0 || $width == 0 || false == $crop_thumbnails ) ) {
 		$attachment_meta = get_post_meta( $thumbnail_id, '_wp_attachment_metadata', true );
 
 		$original_width  = isset( $attachment_meta['width'] )	? absint( $attachment_meta['width'] )	: 0;
@@ -1056,7 +1072,14 @@ function wpsc_the_product_thumbnail( $width = null, $height = null, $product_id 
 		if ( $original_width == 0 || $original_height == 0 )
 			return;
 
-		if ( $width != 0 ) {
+		if ( false == $crop_thumbnails ) {
+            $image_resize_dimensions = image_resize_dimensions( $original_width, $original_height, $width, $height, false );
+
+            if ( ! empty( $image_resize_dimensions ) ) {
+                $width = $image_resize_dimensions[4];
+		        $height = $image_resize_dimensions[5];
+            }
+		} elseif ( $width != 0 ) {
 			$height = ( $original_height / $original_width ) * $width;
 			$height = round( $height, 0 );
 		} elseif ( $height != 0 ) {
@@ -1066,7 +1089,7 @@ function wpsc_the_product_thumbnail( $width = null, $height = null, $product_id 
 	}
 
 	if ( ! $thumbnail && isset( $thumbnail_id ) )
-		$thumbnail = wpsc_product_image( $thumbnail_id, $width, $height );
+        $thumbnail = wpsc_product_image( $thumbnail_id, $width, $height );
 
 	// WordPress's esc_url() function strips out spaces, so encode them here to ensure they don't get stripped out
 	// Ref: http://core.trac.wordpress.org/ticket/23605
