@@ -69,12 +69,7 @@ class WPSC_Product_Variations_Page {
 		}
 
 		if ( isset( $data['sale_price'] ) ) {
-			if ( is_numeric( $data['sale_price'] ) ) {
-				update_product_meta( $id, 'special_price', wpsc_string_to_float( $data['sale_price'] ) );
-			}
-			else {
-				update_product_meta( $id, 'special_price', '' );
-			}
+			update_product_meta( $id, 'special_price', wpsc_string_to_float( $data['sale_price'] ) );
 		}
 
 		if ( isset( $data['sku'] ) )
